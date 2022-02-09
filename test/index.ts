@@ -7,10 +7,6 @@ import { v2Fixture } from "./shared/fixtures";
 
 chai.use(solidity);
 
-const overrides = {
-  gasLimit: 100000,
-};
-
 describe("UniswapV2 Test", () => {
   const provider = new MockProvider();
   const [wallet] = provider.getWallets();
@@ -119,23 +115,13 @@ describe("UniswapV2 Test", () => {
 
   // 入力された資産額とトークン・アドレスの配列が与えられた場合、パスに含まれるトークン・アドレスの各ペアに対して順番にgetReservesを呼び出し、それらを使用してgetAmountOutを呼び出すことで、それ以降のすべての最大出力トークン額を計算します。
   it("getAmountsOut", async () => {
-    // await token0.transfer(
-    //   router.address,
-    //   BigNumber.from(100).mul(BigNumber.from(10).pow(BigNumber.from(18))),
-    //   { from: wallet.address }
-    // );
-    // await token1.transfer(
-    //   router.address,
-    //   BigNumber.from(100).mul(BigNumber.from(10).pow(BigNumber.from(18))),
-    //   { from: wallet.address }
-    // );
     await token0.connect(wallet).approve(router.address, constants.MaxUint256);
     await token1.connect(wallet).approve(router.address, constants.MaxUint256);
     await router.addLiquidity(
       token0.address,
       token1.address,
-      BigNumber.from(10).mul(BigNumber.from(10).pow(BigNumber.from(18))),
-      BigNumber.from(10).mul(BigNumber.from(10).pow(BigNumber.from(18))),
+      BigNumber.from(10000).mul(BigNumber.from(10).pow(BigNumber.from(18))),
+      BigNumber.from(10000).mul(BigNumber.from(10).pow(BigNumber.from(18))),
       0,
       0,
       wallet.address,
@@ -144,8 +130,34 @@ describe("UniswapV2 Test", () => {
     await expect(
       router.getAmountsOut(BigNumber.from(2), [wallet.address])
     ).to.be.revertedWith("UniswapV2Library: INVALID_PATH");
+    const path = [token0.address, token1.address];
+    expect(await router.getAmountsOut(BigNumber.from(2), path)).to.deep.eq([
+      BigNumber.from(2),
+      BigNumber.from(1),
+    ]);
   });
 
   // 出力資産額とトークン・アドレスの配列が与えられると、パス内の各トークン・アドレスのペアに対して順番にgetReservesを呼び出し、それらを使用してgetAmountInを呼び出すことにより、先行するすべての最小入力トークン額を計算します。
-  it("getAmountsIn", async () => {});
+  it("getAmountsIn", async () => {
+    await token0.approve(router.address, constants.MaxUint256);
+    await token1.approve(router.address, constants.MaxUint256);
+    await router.addLiquidity(
+      token0.address,
+      token1.address,
+      BigNumber.from(10000).mul(BigNumber.from(10).pow(BigNumber.from(18))),
+      BigNumber.from(10000).mul(BigNumber.from(10).pow(BigNumber.from(18))),
+      0,
+      0,
+      wallet.address,
+      constants.MaxUint256
+    );
+    await expect(
+      router.getAmountsIn(BigNumber.from(1), [token0.address])
+    ).to.be.revertedWith("UniswapV2Library: INVALID_PATH");
+    const path = [token0.address, token1.address];
+    expect(await router.getAmountsIn(BigNumber.from(1), path)).to.deep.eq([
+      BigNumber.from(2),
+      BigNumber.from(1),
+    ]);
+  });
 });
