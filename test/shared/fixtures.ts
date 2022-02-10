@@ -47,15 +47,17 @@ export async function v2Fixture(
   assert(await router02.deployed(), "contract was not deployed");
 
   // initialize V2
-  // await factoryV2.createPair(tokenA.address, tokenB.address);
-  // const pairAddress = await factoryV2.getPair(tokenA.address, tokenB.address);
-  // const pair = new Contract(pairAddress, JSON.stringify(IUniswapV2Pair.abi), provider).connect(wallet);
+  await factoryV2.createPair(tokenA.address, tokenB.address);
+  const pairAddress = await factoryV2.getPair(tokenA.address, tokenB.address);
+  const pair = new Contract(pairAddress, JSON.stringify(IUniswapV2Pair.abi), provider).connect(wallet);
 
-  // const token0Address = await pair.token0();
-  // const token0 = tokenA.address === token0Address ? tokenA : tokenB;
-  // const token1 = tokenB.address === token0Address ? tokenB : tokenA;
-  const token0 = tokenA;
-  const token1 = tokenB;
+  const token0Address = await pair.token0();
+  console.log(token0Address, tokenA.address);
+  console.log(tokenB.address);
+  // const token0 = tokenA;
+  // const token1 = tokenB;
+  const token0 = tokenA.address === token0Address ? tokenA : tokenB;
+  const token1 = tokenB.address === token0Address ? tokenB : tokenA;
 
   await factoryV2.createPair(WETH.address, WETHPartner.address);
   const WETHPairAddress = await factoryV2.getPair(WETH.address, WETHPartner.address);
