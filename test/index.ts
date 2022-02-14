@@ -1,3 +1,4 @@
+/* eslint-disable node/no-missing-import */
 import { assert } from "console";
 import { ethers } from "hardhat";
 import ERC20 from "../artifacts/contracts/ERC20.sol/WERC20.json";
@@ -8,7 +9,8 @@ import UniswapV2Router02 from "@uniswap/v2-periphery/build/UniswapV2Router02.jso
 import IUniswapV2Pair from "@uniswap/v2-core/build/IUniswapV2Pair.json";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expandTo18Decimlas } from "./shared/utilities";
-import { BigNumber, Contract } from "ethers";
+import { Contract } from "ethers";
+import ExchangeAgent01 from "../artifacts/contracts/ExchangeAgent.sol/TestUniswap.json";
 
 describe("UniswapV2 Test", () => {
   let owner: SignerWithAddress;
@@ -20,6 +22,7 @@ describe("UniswapV2 Test", () => {
   let factoryV2: Contract;
   let router: Contract;
   let pair: Contract;
+  let exchange01: Contract;
 
   beforeEach(async () => {
     [owner, guest, guest1] = await ethers.getSigners();
@@ -58,63 +61,63 @@ describe("UniswapV2 Test", () => {
     await USDC.connect(guest).transfer(guest1.address, expandTo18Decimlas(10), {
       from: guest.address,
     });
+
+    // Exchange agent Contract
+    const ExchangeAgent = await ethers.getContractFactory(
+      ExchangeAgent01.abi,
+      ExchangeAgent01.bytecode
+    );
+    exchange01 = await ExchangeAgent.deploy(
+      factoryV2.address,
+      router.address,
+      WETH.address
+    );
+    assert(await exchange01.deployed(), "contract was not dpeloyed");
   });
 
   it("USDC -> WETH", async () => {
-    // guest1 balance USDC and WETH
-    console.log(
-      "USDC Balance guest1",
-      (await USDC.balanceOf(guest1.address)).toString() / 10 ** 18
+    await USDC.connect(guest).approve(
+      exchange01.address,
+      ethers.constants.MaxUint256
     );
-    console.log(
-      "WETH Balance guest1",
-      (await WETH.balanceOf(guest1.address)).toString() / 10 ** 18
+    await WETH.connect(guest).approve(
+      exchange01.address,
+      ethers.constants.MaxUint256
     );
-    // approve token for guest1
-    await USDC.approve(router.address, ethers.constants.MaxUint256);
-    await WETH.approve(router.address, ethers.constants.MaxUint256);
-    // addLiquidity USDC and WETH pair
-    await router
+    await exchange01
       .connect(guest)
       .addLiquidity(
         USDC.address,
         WETH.address,
-        expandTo18Decimlas(100),
-        expandTo18Decimlas(100),
-        0,
-        0,
-        guest.address,
-        ethers.constants.MaxUint256
+        expandTo18Decimlas(10),
+        expandTo18Decimlas(10)
       );
-    // create USDC and WETH pair Contract
+
     const pairAddress = await factoryV2.getPair(USDC.address, WETH.address);
     pair = new Contract(
       pairAddress,
       JSON.stringify(IUniswapV2Pair.abi),
       ethers.provider
     );
-    console.log("USDC<>WETH pair pool Balance: ", await pair.getReserves());
+
+    console.log(await pair.getReserves());
+    console.log((await WETH.balanceOf(guest1.address)).toString());
+
     await USDC.connect(guest1).approve(
-      router.address,
+      exchange01.address,
       ethers.constants.MaxUint256
     );
-    await router
+    await exchange01
       .connect(guest1)
-      .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+      .swap(
+        USDC.address,
+        WETH.address,
         expandTo18Decimlas(10),
         0,
-        [USDC.address, WETH.address],
-        guest1.address,
-        ethers.constants.MaxUint256
+        guest1.address
       );
-    console.log("USDC<>WETH pair pool Balance: ", await pair.getReserves());
-    console.log(
-      "USDC Balance guest1",
-      (await USDC.balanceOf(guest1.address)).toString() / 10 ** 18
-    );
-    console.log(
-      "WETH Balance guest1",
-      (await WETH.balanceOf(guest1.address)).toString() / 10 ** 18
-    );
+
+    console.log(await pair.getReserves());
+    console.log((await WETH.balanceOf(guest1.address)).toString());
   });
 });
