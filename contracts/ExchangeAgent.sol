@@ -44,7 +44,8 @@ contract TestUniswap {
         address _tokenOut,
         uint _amountIn,
         uint _amountOutMin,
-        address _to
+        address payable _to,
+        bool _after
     ) external {
         IERC20(_tokenIn).transferFrom(msg.sender, address(this), _amountIn);
         IERC20(_tokenIn).approve(ROUTER, _amountIn);
@@ -61,13 +62,24 @@ contract TestUniswap {
             path[2] = _tokenOut;
         }
 
-        IUniswapV2Router(ROUTER).swapExactTokensForTokens(
+        (uint[] memory amount) = IUniswapV2Router(ROUTER).swapExactTokensForTokens(
             _amountIn,
             _amountOutMin,
             path,
             _to,
             block.timestamp
         );
+
+        if (_after) {
+            console.log("Next Processing");
+            require(amount[1] > 0, "You need to sell at least some tokens");
+            uint256 allowance = IERC20(WETH).allowance(msg.sender, address(this));
+            require(allowance >= amount[1], "Check the token allowance");
+            bool sent = IERC20(WETH).transferFrom(msg.sender, address(this), amount[1]);
+            require(sent, "Token transfer failed");
+            console.log("Payment processing is complete");
+        } else {
+        }
     }
 }
 
