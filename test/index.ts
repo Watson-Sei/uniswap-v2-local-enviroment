@@ -2,7 +2,6 @@
 import { assert } from "console";
 import { ethers } from "hardhat";
 import ERC20 from "../artifacts/contracts/ERC20.sol/WERC20.json";
-// import WETH9 from "@uniswap/v2-periphery/build/WETH9.json";
 import WETH9 from "../artifacts/contracts/WETH.sol/WETH.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Router02 from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
@@ -11,11 +10,13 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expandTo18Decimlas } from "./shared/utilities";
 import { Contract } from "ethers";
 import ExchangeAgent01 from "../artifacts/contracts/ExchangeAgent.sol/TestUniswap.json";
+import { expect } from "chai";
 
 describe("UniswapV2 Test", () => {
   let owner: SignerWithAddress;
   let guest: SignerWithAddress;
   let guest1: SignerWithAddress;
+  let guest2: SignerWithAddress;
 
   let USDC: Contract;
   let WETH: Contract;
@@ -25,7 +26,7 @@ describe("UniswapV2 Test", () => {
   let exchange01: Contract;
 
   beforeEach(async () => {
-    [owner, guest, guest1] = await ethers.getSigners();
+    [owner, guest, guest1, guest2] = await ethers.getSigners();
 
     // deploy tokens
     // USDC
@@ -114,10 +115,79 @@ describe("UniswapV2 Test", () => {
         WETH.address,
         expandTo18Decimlas(10),
         0,
-        guest1.address
+        guest1.address,
+        false
       );
 
     console.log(await pair.getReserves());
     console.log((await WETH.balanceOf(guest1.address)).toString());
+  });
+
+  it("illiquidity Swap", async () => {
+    const JPYC9 = await ethers.getContractFactory(ERC20.abi, ERC20.bytecode);
+    const JPYC = await JPYC9.connect(guest1).deploy(10000, "JPY Coin", "JPYC");
+    assert(await JPYC.deployed(), "contract was not deployed");
+
+    await JPYC.connect(guest1).approve(
+      router.address,
+      ethers.constants.MaxUint256
+    );
+    await WETH.connect(guest1).approve(
+      router.address,
+      ethers.constants.MaxUint256
+    );
+    await expect(
+      exchange01
+        .connect(guest1)
+        .swap(
+          JPYC.address,
+          WETH.address,
+          expandTo18Decimlas(10),
+          0,
+          guest1.address,
+          false
+        )
+    ).to.be.reverted;
+    console.log((await JPYC.balanceOf(guest1.address)).toString());
+    console.log((await WETH.balanceOf(guest1.address)).toString());
+  });
+  it("Payment after exchange", async () => {
+    await USDC.connect(guest).approve(
+      exchange01.address,
+      ethers.constants.MaxUint256
+    );
+    await WETH.connect(guest).approve(
+      exchange01.address,
+      ethers.constants.MaxUint256
+    );
+    await exchange01
+      .connect(guest)
+      .addLiquidity(
+        USDC.address,
+        WETH.address,
+        expandTo18Decimlas(10),
+        expandTo18Decimlas(10)
+      );
+    console.log((await USDC.balanceOf(guest1.address)).toString() / 10 ** 18);
+    await USDC.connect(guest1).approve(
+      exchange01.address,
+      ethers.constants.MaxUint256
+    );
+    await WETH.connect(guest1).approve(
+      exchange01.address,
+      ethers.constants.MaxUint256
+    );
+    await exchange01
+      .connect(guest1)
+      .swap(
+        USDC.address,
+        WETH.address,
+        expandTo18Decimlas(10),
+        expandTo18Decimlas(2),
+        guest1.address,
+        true
+      );
+    console.log((await WETH.balanceOf(guest1.address)).toString());
+    console.log((await WETH.balanceOf(exchange01.address)).toString());
   });
 });
