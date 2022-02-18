@@ -11,12 +11,12 @@ import { expandTo18Decimlas } from "./shared/utilities";
 import { Contract } from "ethers";
 import ExchangeAgent01 from "../artifacts/contracts/ExchangeAgent.sol/TestUniswap.json";
 import { expect } from "chai";
+import Back01 from "../artifacts/contracts/Bank.sol/BankWithUniswap.json";
 
 describe("UniswapV2 Test", () => {
   let owner: SignerWithAddress;
   let guest: SignerWithAddress;
   let guest1: SignerWithAddress;
-  let guest2: SignerWithAddress;
 
   let USDC: Contract;
   let WETH: Contract;
@@ -24,9 +24,10 @@ describe("UniswapV2 Test", () => {
   let router: Contract;
   let pair: Contract;
   let exchange01: Contract;
+  let bank01: Contract;
 
   beforeEach(async () => {
-    [owner, guest, guest1, guest2] = await ethers.getSigners();
+    [owner, guest, guest1] = await ethers.getSigners();
 
     // deploy tokens
     // USDC
@@ -74,6 +75,10 @@ describe("UniswapV2 Test", () => {
       WETH.address
     );
     assert(await exchange01.deployed(), "contract was not dpeloyed");
+
+    const Bank = await ethers.getContractFactory(Back01.abi, Back01.bytecode);
+    bank01 = await Bank.deploy(factoryV2.address, router.address, WETH.address);
+    assert(await bank01.deployed(), "contract was not deployed");
   });
 
   it("USDC -> WETH", async () => {
@@ -189,5 +194,40 @@ describe("UniswapV2 Test", () => {
       );
     console.log((await WETH.balanceOf(guest1.address)).toString());
     console.log((await WETH.balanceOf(exchange01.address)).toString());
+  });
+  it("Direct remittance to destination", async () => {
+    await USDC.connect(guest).approve(
+      bank01.address,
+      ethers.constants.MaxUint256
+    );
+    await WETH.connect(guest).approve(
+      bank01.address,
+      ethers.constants.MaxUint256
+    );
+    await bank01
+      .connect(guest)
+      .addLiquidity(
+        USDC.address,
+        WETH.address,
+        expandTo18Decimlas(10),
+        expandTo18Decimlas(10)
+      );
+    console.log((await USDC.balanceOf(guest1.address)).toString() / 10 ** 18);
+    await USDC.connect(guest1).approve(
+      bank01.address,
+      ethers.constants.MaxUint256
+    );
+    await WETH.connect(guest1).approve(
+      bank01.address,
+      ethers.constants.MaxUint256
+    );
+    await bank01
+      .connect(guest1)
+      .swapWithGetContract(
+        USDC.address,
+        WETH.address,
+        expandTo18Decimlas(10),
+        expandTo18Decimlas(2)
+      );
   });
 });
