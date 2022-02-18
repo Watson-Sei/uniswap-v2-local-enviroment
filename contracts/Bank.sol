@@ -3,10 +3,10 @@ pragma solidity >=0.6.6;
 
 import "hardhat/console.sol";
 
-contract TestUniswap {
+contract BankWithUniswap {
     address private FACTORY;
     address private ROUTER;
-    address public WETH;
+    address private WETH;
 
     constructor(address _FACTORY, address _ROUTER, address _WETH) public {
         FACTORY = _FACTORY;
@@ -39,13 +39,11 @@ contract TestUniswap {
             );
     }
 
-    function swap(
+    function swapWithGetContract(
         address _tokenIn,
         address _tokenOut,
         uint _amountIn,
-        uint _amountOutMin,
-        address payable _to,
-        bool _after
+        uint _amountOutMin
     ) external {
         IERC20(_tokenIn).transferFrom(msg.sender, address(this), _amountIn);
         IERC20(_tokenIn).approve(ROUTER, _amountIn);
@@ -66,20 +64,11 @@ contract TestUniswap {
             _amountIn,
             _amountOutMin,
             path,
-            _to,
+            address(this),
             block.timestamp
         );
-
-        if (_after) {
-            console.log("Next Processing");
-            require(amount[1] > 0, "You need to sell at least some tokens");
-            uint256 allowance = IERC20(WETH).allowance(msg.sender, address(this));
-            require(allowance >= amount[1], "Check the token allowance");
-            bool sent = IERC20(WETH).transferFrom(msg.sender, address(this), amount[1]);
-            require(sent, "Token transfer failed");
-            console.log("Payment processing is complete");
-        } else {
-        }
+        console.log("Bank Balance");
+        console.log(IERC20(WETH).balanceOf(address(this)));
     }
 }
 
